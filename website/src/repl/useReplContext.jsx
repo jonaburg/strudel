@@ -1,6 +1,6 @@
 /*
 Repl.jsx - <short description TODO>
-Copyright (C) 2022 Strudel contributors - see <https://github.com/tidalcycles/strudel/blob/main/repl/src/App.js>
+Copyright (C) 2022 Strudel contributors - see <https://codeberg.org/uzu/strudel/src/branch/main/repl/src/App.js>
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details. You should have received a copy of the GNU Affero General Public License along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
@@ -124,6 +124,81 @@ export function useReplContext() {
       bgFill: false,
     });
     window.strudelMirror = editor;
+
+    const initWebSocket = () => {
+      if (window.strudelWebSocket) {
+        return; 
+      }
+      
+      try {
+        const ws = new WebSocket('ws://localhost:8080');
+        
+        ws.addEventListener('open', (event) => {
+          console.log('Connected to Strudel WebSocket');
+          window.strudelWebSocket = ws;
+        });
+        
+        ws.addEventListener('close', (event) => {
+          console.log('Disconnected from WebSocket:', event.reason);
+          window.strudelWebSocket = null;
+          setTimeout(initWebSocket, 3000);
+        });
+        
+        ws.addEventListener('error', (event) => {
+          console.warn('WebSocket connection failed');
+          window.strudelWebSocket = null;
+        });
+        
+        ws.addEventListener('message', (event) => {
+          try {
+            const message = JSON.parse(event.data);
+            console.log('Received command from websocket:', message.command);
+            
+            switch(message.command) {
+              case 'update':
+                console.log('Updating');
+                editor.setCode(message.code);
+                break;
+                
+              case 'play':
+                console.log('▶️ Playing');
+                editor.setCode(message.code);
+                editor.evaluate();
+                break;
+                
+              case 'stop':
+                console.log('⏹️ Stopping');
+                editor.stop();
+                break;
+                
+              case 'evaluate':
+                console.log('Evaluating...');
+                editor.evaluate();
+                break;
+                
+              case 'toggle':
+                console.log('toggling playback...');
+                editor.toggle();
+                break;
+                
+              case 'welcome':
+                console.log(message.message);
+                break;
+                
+              default:
+                console.log('Unknown command:', message.command);
+            }
+          } catch (e) {
+            console.error('Error parsing WebSocket message:', e);
+          }
+        });
+        
+      } catch (error) {
+        console.warn('WebSocket not available');
+      }
+    };
+    
+    initWebSocket();
 
     // init settings
     initCode().then(async (decoded) => {
